@@ -8,46 +8,55 @@
 
 using namespace std;
 
+
+//Structure to store subscription at some rsu
 typedef struct {
 	int start_time,end_time,rsu,id;
 }subscriptions;
 
+
+//Structure to store rsu info
 typedef struct {
 	int capacity,cost,id;
 }rsu_struct;
 
+
+//Struture to store chunk info
 typedef struct {
 	int rsu,coc,event,start_time,end_time,n,valid;
 	double acoc,cbye;
 	vector<int> f;
 }chunk_struct;
 
-vector<rsu_struct> rsu;
-vector<vector<subscriptions > > sub;
-set<int> event[MAXEVENTS];
-vector<vector<int> > cap_left;
-vector<vector<set<int > > > event_overlap;
-vector<int> reject;
-vector<chunk_struct > final;
+
+vector<rsu_struct> rsu; //rsu[u] Stores the info about the rsu u
+vector<vector<subscriptions > > sub; // sub[id] stores the vector having all of its rsu and the expected time internals of subscription id.
+set<int> event[MAXEVENTS]; //event[e] stores all the subscribers that are subscribed to event e.
+vector<vector<int> > cap_left;//cap_left[u][t] stores the capacity left at rsu u during the time slot t.
+vector<vector<set<int > > > event_overlap; // event_overlap[u][t] stores all the events that are overlapping at rsu u during time slot t.
+vector<int> reject; 
 map<int ,int > rsu_map;
 map<int ,int > sub_map;
 map<int ,int > e_map;
-
-vector<int> weight_chunks;
-vector<chunk_struct> max_chunks;
-vector<vector<chunk_struct > > chunks;
-vector<vector<set<int > > > e_rsu;
-vector<map<int, subscriptions > >  s_rsu;
+vector<int> sub_event;//sub_event[i] stores its correspoing event;
+vector<int> weight_chunks;//weight_chunks[u] stores the weight of the maximum wwighted chunk at rsu u.
+vector<chunk_struct> max_chunks;//max_chunks[u] stores the maximum chunk at rsu u.
+vector<vector<chunk_struct > > chunks; // chunks[e][u] stores all chunks of event e at rsu u.
+vector<vector<set<int > > > e_rsu;//e_rsu[e][u] stores all the subscribers of event e at rsu u.
+vector<map<int, subscriptions > >  s_rsu;//S_rsu[s] stores all tuples of the form <u, subscriptions> where u is the rsu present in the path of the subscriber s
 int rsu_max,sub_no,rsu_no,time_slots,totalcost,sum=0,w1,w2,nume=-1,ev_no;
+
+
+
+//Read all the rsu's
 void read_rsus(char *filename){
 	FILE* fp = fopen(filename,"r");
 	fscanf(fp,"%d",&rsu_max);
 	rsu.resize(rsu_max);
 	rsu_struct temp_rsu;
-	//printf("%d\n",rsu.size());
+	
 	for(int i=0,temp,cap,cost,id; i < rsu_max; i++){
 		fscanf(fp,"%d %d %d %d",&id,&temp,&cap,&cost);
-		//printf("%d %d\n",cap,i);
 		rsu[i].capacity = cap;
 		rsu[i].cost = cost;
 		rsu[i].id = i;
@@ -59,14 +68,16 @@ void read_rsus(char *filename){
 	fclose(fp);
 }
 
-void read_subscriptions(char *filename){
 
+//Read all the subscriptions
+void read_subscriptions(char *filename){
 	
 	int temp,s,e,u,st,et,max = -1;
 	subscriptions temp_sub;
 	FILE* fp = fopen(filename,"r");
 	fscanf(fp,"%d %d %d %d %d",&temp,&temp,&ev_no,&sub_no,&rsu_no);
 	sub.resize(sub_no);
+	sub_event.resize(sub_no);
 	s_rsu.resize(sub_no+1);
 	int i = 0,j = 0,id;
 	map<int,int>::iterator it;
@@ -91,12 +102,15 @@ void read_subscriptions(char *filename){
 		it = e_map.find(e);
 		if(it == e_map.end()){
 			event[j].insert(id);
+			sub_event[id] = j;
 			e_map.insert(pair<int,int>(e,j));
 			j++;
-		}else event[(*it).second].insert(id);	
+		}else {
+			event[(*it).second].insert(id);	
+			sub_event[id]=(*it).second;
+		}
 		s_rsu[id].insert(pair<int, subscriptions>(temp_sub.rsu, temp_sub));
 		max = (max>et)?max:et;
-		for(int e_id=st;e_id<et;e_id++) event_overlap[u][e_id].insert(e);	
 	}
 	time_slots = max;
 	fclose(fp);
@@ -113,6 +127,11 @@ void init(){
 	for(i=0;i<rsu_max;i++)
 		for(j=0;j<time_slots;j++)
 			cap_left[i][j] = rsu[i].capacity;
+
+	for(i=0;i<sub_no;i++){
+		for(j=0;j<sub[i].size();k++)
+			for(int e_id=sub[i][j].start_time;e_id<sub[i][j].end_time;e_id++) event_overlap[sub[i][j].rsu][e_id].insert(sub_event[sub[i][j].id]);
+	}
 }
 
 
@@ -269,8 +288,8 @@ int main(int argc, char *argv[]){
 		w1 = atoi(argv[3]);
 		w2 = atoi(argv[4]);
 		read_rsus(argv[1]);
-		init();
 		read_subscriptions(argv[2]);
+		init();
 		//for(int i=0;i<rsu_max;i++) printf("%d %d %d\n",rsu[i].id,rsu[i].capacity,rsu[i].cost);
 		//for(int i=1;i<=sub_no;i++) for(int j=0;j<sub[i].size();j++)printf("%d %d %d %d\n",sub[i][j].id,sub[i][j].rsu,sub[i][j].start_time,sub[i][j].end_time);
 		//for(int i=0;i<rsu_max;i++) {for(int j=0;j<time_slots;j++) printf("%d ",cap_left[i][j]);printf("\n");}
